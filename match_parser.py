@@ -1,8 +1,6 @@
 import re
 from datetime import datetime
-from string import digits
 from bs4 import BeautifulSoup
-from math import floor
 from time import sleep
 import requests
 import pytz
@@ -10,10 +8,11 @@ import pytz
 # Must run get_match_html before any other get functions.  All other functions require match page html as input.
 # This is to help avoid rate limiting from hltv.org (and to optimize perforamce)
 
-def get_match_html(url):
+def get_page_html(url, sleep_time=0):
     """
-    Gets full html for match page.
+    Gets full html for match page. Optional sleep timer for rate limiting.
     """
+    sleep(sleep_time)
     response = requests.get(url)
     html = response.text
     match_html = BeautifulSoup(html, 'html.parser')
@@ -48,7 +47,7 @@ def get_match_type(match_html):
 
 
 # Get teams
-def get_teams_from_html(match_html):
+def get_match_teams(match_html):
     """
     Get teams and team ids from full match page html.  Returns dictioary. Keys: team1, team2.  Values: tuples (team_name, team_id).
     """
@@ -106,7 +105,7 @@ def get_match_score(match_html, team1 = 'team1', team2 = 'team2'):
     return score
 
 # Get match_maps
-def get_map_names(match_html, exclude_not_played = True):
+def get_match_map_names(match_html, exclude_not_played = True):
     """
     Returns list of maps played in play order.  Optionally can include list of maps not played as second list.
     """
@@ -129,7 +128,7 @@ def get_map_names(match_html, exclude_not_played = True):
     return maps_played, maps_not_played
 
 # Get map winner
-def get_map_winners(match_html, team1 = 'team1', team2 = 'team2'):
+def get_match_map_winners(match_html, team1 = 'team1', team2 = 'team2'):
     """
     Returns ordered list of which team won each map.
     """
@@ -161,3 +160,89 @@ def get_match_winner(match_html, team1 = 'team1', team2 = 'team2'):
         return team1
     else:
         return team2
+
+# Get map scores
+
+def get_match_map_scores(match_html, team1 = 'team1', team2 = 'team2', map_names = None):
+
+    result_left_list = match_html.find_all('div', {'class':'results-left'})
+    result_right_list = match_html.find_all('span', {'class':'results-right'})
+
+    scores = []
+    for i in range(len(result_left_list)):
+        team1_score = result_left_list[i].find('div', {'class': 'results-team-score'}).text
+        team2_score = result_right_list[i].find('div', {'class': 'results-team-score'}).text
+        try:
+            team1_score = int(team1_score)
+            team2_score = int(team2_score)
+            scores.append([team1_score, team2_score])
+        except:
+            next
+
+    return scores
+
+# Get match rosters
+def get_match_rosters(match_html, get='all'):
+    """
+    Returns dictionary with 4 keys.  team1_name, team2_name, team1_roster, team2_roster.
+    Each roster is a list of tuples.  (nickname, firstname, lastname, id, link suffix)
+    """
+# #    This functionality has not been added yet.
+#     if get not in ['pid', 'nick', 'all']:
+#         raise TypeError("get must be 'pid', 'nick', or 'all'")
+
+    stats_tables_html = match_html.find_all('table', {'class':'table totalstats'})
+
+    # For each team there is one table per map and one table for all maps.  So if 3 maps were played there will be 8 tables in total, 4 for each team.
+    # Indices alternate teams.  Index 0 -> team 1, index 1 -> team 2, etc.
+
+    # Gets list of length 6, first element contains team name.
+    team1_table_html = stats_tables_html[0].find_all('td', {'class':'players'})
+    team2_table_html = stats_tables_html[1].find_all('td', {'class':'players'})
+
+    team1_name = team1_table_html[0].find('a', {'class': 'teamName team'}).text
+    team2_name = team2_table_html[0].find('a', {'class': 'teamName team'}).text
+
+    team1_players_html = team1_table_html[1:]
+    team2_players_html = team2_table_html[1:]
+
+    team1_roster = []
+
+    for player in team1_players_html:
+        name = player.find('div', {'class': 'statsPlayerName'}).text
+
+        matches = re.search(r"^(\w+)\s+'(\w+)'\s+(\w+)$", name)
+        first_name = matches.group(1)
+        nickname = matches.group(2)
+        last_name = matches.group(3)
+
+        player_link = player.find('a', href=re.compile(r'/player/\d+')).get('href')
+        player_number = re.search(r'/player/(\d+)/', player_link).group(1)
+
+        team1_roster.append((nickname, first_name, last_name, player_number, player_link))
+
+
+    team2_roster = []
+
+    for player in team2_players_html:
+        name = player.find('div', {'class': 'statsPlayerName'}).text
+
+        matches = re.search(r"^(\w+)\s+'(\w+)'\s+(\w+)$", name)
+        first_name = matches.group(1)
+        nickname = matches.group(2)
+        last_name = matches.group(3)
+
+        player_link = player.find('a', href=re.compile(r'/player/\d+')).get('href')
+        player_number = re.search(r'/player/(\d+)/', player_link).group(1)
+
+        team2_roster.append((nickname, first_name, last_name, player_number, player_link))
+
+
+    rosters = {}
+
+    rosters['team1_name'] = team1_name
+    rosters['team1'] = team1_roster
+    rosters['team2_name'] = team2_name
+    rosters['team2'] = team2_roster
+
+    return rosters
