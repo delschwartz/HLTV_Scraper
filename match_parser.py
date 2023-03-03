@@ -18,6 +18,17 @@ def get_page_html(url, sleep_time=0):
     match_html = BeautifulSoup(html, 'html.parser')
     return match_html
 
+# Get match id and title
+def get_match_id_title(match_url):
+
+    match = re.search(r"/matches/(\d+)/(.+)$", match_url)
+    if match:
+        match_id = match.group(1)
+        match_title = match.group(2).replace('-', '_')
+
+    return match_id, match_title
+
+
 # Get match date & time in unix format
 def get_match_datetime(match_html):
     """

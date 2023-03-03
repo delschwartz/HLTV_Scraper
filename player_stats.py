@@ -1,8 +1,9 @@
 import re
 import datetime as dt
 from bs4 import BeautifulSoup
-import requests
 from dateutil.relativedelta import relativedelta
+
+from match_parser import *
 
 # Get player stats page url
 def get_player_stats_page_url(player_nick, player_id, start_date = None, end_date = None, on_maps = None):

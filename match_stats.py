@@ -1,15 +1,26 @@
+import re
+import datetime as dt
+from bs4 import BeautifulSoup
+from dateutil.relativedelta import relativedelta
+
+from match_parser import *
+from player_stats import *
+
 # Get player stats from X days before the match
-def get_player_stats_prior_to_match(match_url, time_delta, sleep_time=0.1):
+def get_all_player_stats_prior_to_match(match_url, player_stat_range, sleep_time=0.1):
     """
-    Gets individual player stats from the day before to 'time_delta' days before the match.  Returns a nested dict with outer keys (team name, team id), and inner keys (player nick, player id).
+    Gets player stats from the day before up to 'player_stat_range' days before
+    the match.  Returns a nested dict with outer keys (team name, team id), and
+    inner keys (player nick, player id).
     """
+
 
     match_html = get_page_html(match_url, sleep_time)
 
     # Find start and end date for stats to scrape
     match_date_dt = get_match_datetime(match_html)
 
-    start_date_dt = match_date_dt - relativedelta(days = time_delta)
+    start_date_dt = match_date_dt - relativedelta(days = player_stat_range)
     end_date_dt = match_date_dt - relativedelta(days=1)
 
     start_date = start_date_dt.strftime("%Y-%m-%d")
