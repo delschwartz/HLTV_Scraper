@@ -23,3 +23,6 @@ Current list of functions per file.
 
 ### match_stats.py
 * get_player_stats_prior_to_match
+
+### scraper.py
+* get_results_list
