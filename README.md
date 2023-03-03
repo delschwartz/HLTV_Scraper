@@ -19,7 +19,7 @@ Current list of functions per file.
 
 ### player_stats.py
 * get_player_stats_page_url
-* def get_player_stats_block(player_stats_html):
+* get_player_stats_block
 
 ### match_stats.py
 * get_player_stats_prior_to_match
