@@ -192,62 +192,37 @@ def get_match_map_scores(match_html, team1 = 'team1', team2 = 'team2', map_names
 
     return scores
 
-# Get match rosters
-def get_match_rosters(match_html, get='all'):
+# Get match rosters - Uses lineups instead of stats table since stats table is sometimes missing
+def get_match_rosters(match_html):
     """
     Returns dictionary with 4 keys.  team1_name, team2_name, team1_roster, team2_roster.
-    Each roster is a list of tuples.  (nickname, firstname, lastname, id, link suffix)
+    Each roster is a list of tuples.  (id, nickname)
     """
-# #    This functionality has not been added yet.
-#     if get not in ['pid', 'nick', 'all']:
-#         raise TypeError("get must be 'pid', 'nick', or 'all'")
 
-    stats_tables_html = match_html.find_all('table', {'class':'table totalstats'})
+    lineups_html = match_html.find_all('div', {'class':'lineup standard-box'})
 
-    # For each team there is one table per map and one table for all maps.  So if 3 maps were played there will be 8 tables in total, 4 for each team.
-    # Indices alternate teams.  Index 0 -> team 1, index 1 -> team 2, etc.
+    team1_name = lineups_html[0].find('a', {'class': 'text-ellipsis'}).text
+    team2_name = lineups_html[1].find('a', {'class': 'text-ellipsis'}).text
 
-    # Gets list of length 6, first element contains team name.
-    team1_table_html = stats_tables_html[0].find_all('td', {'class':'players'})
-    team2_table_html = stats_tables_html[1].find_all('td', {'class':'players'})
+    team1_players_html = lineups_html[0].select('td.player:not(.player-image)')
+    team2_players_html = lineups_html[1].select('td.player:not(.player-image)')
 
-    team1_name = team1_table_html[0].find('a', {'class': 'teamName team'}).text
-    team2_name = team2_table_html[0].find('a', {'class': 'teamName team'}).text
-
-    team1_players_html = team1_table_html[1:]
-    team2_players_html = team2_table_html[1:]
-
-    team1_roster = []
+    team1_roster =[]
 
     for player in team1_players_html:
-        name = player.find('div', {'class': 'statsPlayerName'}).text
-
-        matches = re.search(r"^(\w+)\s+'(\w+)'\s+(\w+)$", name)
-        first_name = matches.group(1)
-        nickname = matches.group(2)
-        last_name = matches.group(3)
-
-        player_link = player.find('a', href=re.compile(r'/player/\d+')).get('href')
-        player_number = re.search(r'/player/(\d+)/', player_link).group(1)
-
-        team1_roster.append((nickname, first_name, last_name, player_number, player_link))
+        player_div = player.find('div', class_='text-ellipsis')
+        player_nickname = player_div.text
+        player_id = player_div.parent['data-player-id']
+        team1_roster.append((player_id, player_nickname))
 
 
-    team2_roster = []
+    team2_roster =[]
 
     for player in team2_players_html:
-        name = player.find('div', {'class': 'statsPlayerName'}).text
-
-        matches = re.search(r"^(\w+)\s+'(\w+)'\s+(\w+)$", name)
-        first_name = matches.group(1)
-        nickname = matches.group(2)
-        last_name = matches.group(3)
-
-        player_link = player.find('a', href=re.compile(r'/player/\d+')).get('href')
-        player_number = re.search(r'/player/(\d+)/', player_link).group(1)
-
-        team2_roster.append((nickname, first_name, last_name, player_number, player_link))
-
+        player_div = player.find('div', class_='text-ellipsis')
+        player_nickname = player_div.text
+        player_id = player_div.parent['data-player-id']
+        team2_roster.append((player_id, player_nickname))
 
     rosters = {}
 

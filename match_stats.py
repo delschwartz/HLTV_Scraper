@@ -33,14 +33,14 @@ def get_all_player_stats_prior_to_match(match_url, player_stat_range, sleep_time
 
     team1_nick_pid = []
     for player in team1_roster:
-        nick = player[0]
-        pid = player[3]
+        nick = player[1]
+        pid = player[0]
         team1_nick_pid.append((nick, pid))
 
     team2_nick_pid = []
     for player in team2_roster:
-        nick = player[0]
-        pid = player[3]
+        nick = player[1]
+        pid = player[0]
         team2_nick_pid.append((nick, pid))
 
     team1_player_stats_urls = []
