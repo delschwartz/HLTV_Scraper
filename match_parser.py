@@ -5,6 +5,9 @@ from time import sleep
 import requests
 import pytz
 
+# from cloudscraper_object import cscraper, reset_cloudscraper
+import cloudscraper
+
 # Must run get_match_html before any other get functions.  All other functions require match page html as input.
 # This is to help avoid rate limiting from hltv.org (and to optimize perforamce)
 
@@ -13,15 +16,22 @@ def get_page_html(url, sleep_time=0):
     Gets full html for match page. Optional sleep timer for rate limiting.
     """
     sleep(sleep_time)
-    response = requests.get(url)
+    cscraper = cloudscraper.create_scraper()
+    response = cscraper.get(url)
     html = response.text
     match_html = BeautifulSoup(html, 'html.parser')
     return match_html
 
 # Get match id and title
-def get_match_id_title(match_url):
+def get_match_id_title(match_url, from_html=False):
+
+    # if statement adds ability to pull id & title from the page html
+    if from_html:
+        match_html = match_url
+        match_url = match_html.find('head').find('link', {'rel':'canonical'})['href']
 
     match = re.search(r"/matches/(\d+)/(.+)$", match_url)
+
     if match:
         match_id = match.group(1)
         match_title = match.group(2).replace('-', '_')
