@@ -3,7 +3,7 @@ import datetime as dt
 from utilities import *
 from match_parser import *
 from player_stats import *
-from match_stats import *
+# from match_stats import *
 
 def scrape_match_list(start_date, end_date, sleep_time = 0.1, update_csv=True):
     """
