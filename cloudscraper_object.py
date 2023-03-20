@@ -1,3 +1,5 @@
+# Currently unused
+
 import cloudscraper
 
 cscraper = cloudscraper.create_scraper()

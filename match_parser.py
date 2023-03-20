@@ -10,12 +10,10 @@ import cloudscraper
 
 from utilities import *
 
-# Must run get_match_html before any other get functions.  All other functions require match page html as input.
-# This is to help avoid rate limiting from hltv.org (and to optimize perforamce)
 
 def get_page_html(url, sleep_time=0):
     """
-    Gets full html for match page. Optional sleep timer for rate limiting.
+    Gets full html for a page. Optional sleep timer for rate limiting.
     """
     sleep(sleep_time)
     cscraper = cloudscraper.create_scraper()
