@@ -2,6 +2,7 @@ import re
 import datetime as dt
 from bs4 import BeautifulSoup
 from dateutil.relativedelta import relativedelta
+from collections import OrderedDict
 
 from match_parser import *
 
@@ -53,7 +54,7 @@ def get_player_stats_page_url(player_nick, player_id, start_date = None, end_dat
     return stats_url
 
 
-# This is messy, could be cleaned up but it works fine as is.
+
 def get_player_stats_block(player_stats_html):
     """
     Gets both basic stats blocks on player stats page.
@@ -65,45 +66,54 @@ def get_player_stats_block(player_stats_html):
     stat_values = []
 
     # First summary stat block
-    summaryBreakdownContainer = player_stats_html.find('div', {'class': 'summaryBreakdownContainer'})
-    summaryStatBreakdownRow = summaryBreakdownContainer.find_all('div', {'class':'summaryStatBreakdownRow'})
-    summaryStatBreakdown = summaryBreakdownContainer.find_all('div', {'class': re.compile(r"summaryStatBreakdown (.*)")})
+    try:
+        summaryBreakdownContainer = player_stats_html.find('div', {'class': 'summaryBreakdownContainer'})
+        summaryStatBreakdownRow = summaryBreakdownContainer.find_all('div', {'class':'summaryStatBreakdownRow'})
+        summaryStatBreakdown = summaryBreakdownContainer.find_all('div', {'class': re.compile(r"summaryStatBreakdown (.*)")})
 
-    for stat_html in summaryStatBreakdown:
-        stat_types_1.append(stat_html.find('div', {'class':'summaryStatBreakdownSubHeader'}).find('b').text)
-        stat_values_str.append(stat_html.find('div', {'class':'summaryStatBreakdownDataValue'}).text)
+        for stat_html in summaryStatBreakdown:
+            stat_types_1.append(stat_html.find('div', {'class':'summaryStatBreakdownSubHeader'}).find('b').text)
+            stat_values_str.append(stat_html.find('div', {'class':'summaryStatBreakdownDataValue'}).text)
 
-    # Second stat block
-    stat_block_html = player_stats_html.find('div', {'class': 'statistics'})
-    stats_rows = stat_block_html.find_all('div', {'class':'stats-row'})
 
-    stat_types_2 = []
-    for row in stats_rows:
-        stat_types_2.append(row.find('span').text)
+        # Second stat block
+        stat_block_html = player_stats_html.find('div', {'class': 'statistics'})
+        stats_rows = stat_block_html.find_all('div', {'class':'stats-row'})
 
-    for stat_type in stat_types_2:
-        stat_values_str.append(stat_block_html.find('span', text=stat_type).find_next_sibling('span').text)
+        stat_types_2 = []
 
-    stat_types = stat_types_1 + stat_types_2
+        for row in stats_rows:
+            stat_types_2.append(row.find('span').text)
 
-    for item in stat_types:
-        modified_item = item.lower().replace(' / ', '_per_').replace('/','').replace(' ', '_').replace('%', 'percent').replace('.0','')
-        modified_list.append(modified_item)
+        for stat_type in stat_types_2:
+            stat_values_str.append(stat_block_html.find('span', string=stat_type).find_next_sibling('span').text)
 
-    for item in stat_values_str:
-        if item[-1] == '%':
-            stat_values.append(float(item[:-1])/100)
-        else:
-            stat_values.append(float(item))
+        stat_types = stat_types_1 + stat_types_2
 
-    stats_dict = dict(zip(modified_list, stat_values))
-    return stats_dict
+        for item in stat_types:
+            modified_item = item.lower().replace(' / ', '_per_').replace('/','').replace(' ', '_').replace('%', 'percent').replace('.0','')
+            modified_list.append(modified_item)
+
+
+        for item in stat_values_str:
+            if item[-1] == '%':
+                stat_values.append(float(item[:-1])/100)
+            else:
+                stat_values.append(float(item))
+
+
+        stats_dict = dict(zip(modified_list, stat_values))
+
+        return stats_dict
+    except:
+        print("ERROR: Player stats not found!")
+        return None
 
 
 # Get player stats from X days before the match
-def get_player_stats_prior_to_match(match_html, player_stat_range, sleep_time=0.1):
+def get_player_stats_prior_to_match(match_html, player_stat_range, sleep_time=0.05):
     """
-    Gets player stats from the day before to 'player_stat_range' days before the match.  Returns a nested dict with outer keys (team name, team id), and inner keys (player nick, player id).
+    Gets player stats from the day before to 'player_stat_range' days before the match.  Returns a nested dict with outer keys team_id, and inner keys player_id.
     """
 
     # Find start and end date for stats to scrape
@@ -116,9 +126,10 @@ def get_player_stats_prior_to_match(match_html, player_stat_range, sleep_time=0.
     end_date = end_date_dt.strftime("%Y-%m-%d")
 
     # Get player rosters, clean output, then generate urls
-    rosters = get_match_rosters(match_html)
+    rosters_od = get_match_rosters(match_html, include_nicknames=True)
+    team_ids = list(rosters_od.keys())
 
-    team1_roster, team2_roster = rosters['team1'], rosters['team2']
+    team1_roster, team2_roster = rosters_od[team_ids[0]], rosters_od[team_ids[1]]
 
     team1_player_stats_urls = []
     for pid, nick in team1_roster:
@@ -132,18 +143,18 @@ def get_player_stats_prior_to_match(match_html, player_stat_range, sleep_time=0.
     for i in range(len(team1_roster)):
         player_stats_html = get_page_html(team1_player_stats_urls[i], sleep_time)
         stats_block = get_player_stats_block(player_stats_html)
-        team1_player_stats[team1_roster[i]] = stats_block
+        team1_player_stats[team1_roster[i][0]] = stats_block
 
     team2_player_stats = {}
     for i in range(len(team2_roster)):
         player_stats_html = get_page_html(team2_player_stats_urls[i], sleep_time)
         stats_block = get_player_stats_block(player_stats_html)
-        team2_player_stats[team2_roster[i]] = stats_block
+        team2_player_stats[team2_roster[i][0]] = stats_block
 
     teams = get_match_teams(match_html)
 
-    player_stats_prior_match = {}
-    player_stats_prior_match[teams['team1']] = team1_player_stats
-    player_stats_prior_match[teams['team2']] = team2_player_stats
+    player_stats_prior_match = OrderedDict()
+    player_stats_prior_match[team_ids[0]] = team1_player_stats
+    player_stats_prior_match[team_ids[1]] = team2_player_stats
 
     return player_stats_prior_match

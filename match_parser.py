@@ -4,9 +4,11 @@ from bs4 import BeautifulSoup
 from time import sleep
 import requests
 import pytz
+from collections import OrderedDict
 
-# from cloudscraper_object import cscraper, reset_cloudscraper
 import cloudscraper
+
+from utilities import *
 
 # Must run get_match_html before any other get functions.  All other functions require match page html as input.
 # This is to help avoid rate limiting from hltv.org (and to optimize perforamce)
@@ -24,8 +26,6 @@ def get_page_html(url, sleep_time=0):
 
 # Get match id and title
 def get_match_id_title(match_url, from_html=False):
-
-    # if statement adds ability to pull id & title from the page html
     if from_html:
         match_html = match_url
         match_url = match_html.find('head').find('link', {'rel':'canonical'})['href']
@@ -68,11 +68,11 @@ def get_match_type(match_html):
 
 
 # Get teams
-def get_match_teams(match_html):
+def get_match_teams(match_html, update_csv=False, quiet=True):
     """
-    Get teams and team ids from full match page html.  Returns dictioary. Keys: team1, team2.  Values: tuples (team_name, team_id).
+    Get teams and team ids from full match page html
     """
-    teams = {}
+    teams = OrderedDict()
 
     html1_text = match_html.find('div', {'class': 'team1-gradient'})
     id_text = html1_text.find('a')
@@ -81,8 +81,7 @@ def get_match_teams(match_html):
 
     name_text = html1_text.find('div', {'class': 'teamName'})
     team1_name = name_text.text
-
-    teams['team1'] = (team1_name, team1_id)
+    teams[team1_id] = team1_name
 
 
     html2_text = match_html.find('div', {'class': 'team2-gradient'})
@@ -92,10 +91,15 @@ def get_match_teams(match_html):
 
     name_text = html2_text.find('div', {'class': 'teamName'})
     team2_name = name_text.text
+    teams[team2_id] = team2_name
 
-    teams['team2'] = (team2_name, team2_id)
+    teams_ids_names = [[tid, name] for tid, name in teams.items()]
+    if update_csv:
+        teams_csv = "data/teams.csv"
+        update_csv_file(teams_csv, teams_ids_names, ['id', 'name'], quiet=quiet)
 
     return teams
+
 
 # Get match score
 def get_match_score(match_html, team1 = 'team1', team2 = 'team2'):
@@ -124,6 +128,7 @@ def get_match_score(match_html, team1 = 'team1', team2 = 'team2'):
     score['winner'] = winner
 
     return score
+
 
 # Get match_maps
 def get_match_map_names(match_html, exclude_not_played = True):
@@ -202,43 +207,73 @@ def get_match_map_scores(match_html, team1 = 'team1', team2 = 'team2', map_names
 
     return scores
 
-# Get match rosters - Uses lineups instead of stats table since stats table is sometimes missing
-def get_match_rosters(match_html):
+
+# Get match rosters - Uses lineups instead of stats table
+
+# Get match rosters - Uses lineups instead of stats table
+
+def get_match_rosters(match_html, include_nicknames=False, update_csv=False, quiet=True):
     """
-    Returns dictionary with 4 keys.  team1_name, team2_name, team1_roster, team2_roster.
-    Each roster is a list of tuples.  (id, nickname)
+    Returns ordered dictionary with keys = team ids, values = player ids.
+    Optionally can set values as tuples (player_id, nickname).
+    Update csv will always save player id and nickname regardless of include_nicknames.
     """
 
     lineups_html = match_html.find_all('div', {'class':'lineup standard-box'})
 
-    team1_name = lineups_html[0].find('a', {'class': 'text-ellipsis'}).text
-    team2_name = lineups_html[1].find('a', {'class': 'text-ellipsis'}).text
+    teams_od = get_match_teams(match_html, update_csv=update_csv)
+    team_ids = list(teams_od.keys())
 
     team1_players_html = lineups_html[0].select('td.player:not(.player-image)')
     team2_players_html = lineups_html[1].select('td.player:not(.player-image)')
 
-    team1_roster =[]
+    team1_roster_ids =[]
+    team1_roster_names =[]
 
     for player in team1_players_html:
-        player_div = player.find('div', class_='text-ellipsis')
-        player_nickname = player_div.text
-        player_id = player_div.parent['data-player-id']
-        team1_roster.append((player_id, player_nickname))
+        try:
+            player_div = player.find('div', class_='text-ellipsis')
+            player_nickname = player_div.text
+            player_id = player_div.parent['data-player-id']
+        except:
+            print("ERROR: Player name or ID not found!")
+            player_nickname = "???"
+            player_id = "???"
+        team1_roster_ids.append(player_id)
+        team1_roster_names.append(player_nickname)
 
 
-    team2_roster =[]
+    team2_roster_ids =[]
+    team2_roster_names =[]
 
     for player in team2_players_html:
-        player_div = player.find('div', class_='text-ellipsis')
-        player_nickname = player_div.text
-        player_id = player_div.parent['data-player-id']
-        team2_roster.append((player_id, player_nickname))
+        try:
+            player_div = player.find('div', class_='text-ellipsis')
+            player_nickname = player_div.text
+            player_id = player_div.parent['data-player-id']
+        except:
+            print("ERROR: Player name or ID not found!")
+            player_nickname = "???"
+            player_id = "???"
+        team2_roster_ids.append(player_id)
+        team2_roster_names.append(player_nickname)
 
-    rosters = {}
+    rosters = OrderedDict()
 
-    rosters['team1_name'] = team1_name
-    rosters['team1'] = team1_roster
-    rosters['team2_name'] = team2_name
-    rosters['team2'] = team2_roster
+    if include_nicknames:
+        rosters[team_ids[0]] = [(pid, nick) for pid, nick in zip(team1_roster_ids, team1_roster_names)]
+        rosters[team_ids[1]] = [(pid, nick) for pid, nick in zip(team2_roster_ids, team2_roster_names)]
+
+    else:
+        rosters[team_ids[0]] = team1_roster_ids
+        rosters[team_ids[1]] = team2_roster_ids
+
+    if update_csv:
+        all_player_ids_from_match = team1_roster_ids + team2_roster_ids
+        all_player_names_from_match = team1_roster_names + team2_roster_names
+        all_ids_names = [[pid, name] for pid, name in zip(all_player_ids_from_match, all_player_names_from_match)]
+
+        players_csv = "data/players.csv"
+        update_csv_file(players_csv, all_ids_names, ['id', 'nickname'], quiet=quiet)
 
     return rosters
